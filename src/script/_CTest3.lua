@@ -1,0 +1,8 @@
+CTest3 = class(CTest2)
+
+function OnInit() 				
+	Obj = CTest3.new(1)
+	Obj:SetName("Derived Script Dynamic Obj 3")		
+	Obj:Forward(Obj:test2(-60))
+	return 1;
+end

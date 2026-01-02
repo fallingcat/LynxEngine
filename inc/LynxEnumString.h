@@ -1,0 +1,19 @@
+﻿#ifndef __LYNXENUMSTRING_H__
+#define __LYNXENUMSTRING_H__
+
+#include <LynxGraphics.h>
+#include <LynxEngineClasses.h>
+#include <LynxEnumParam.h>
+#include <MaterialSystem/LynxMaterial.h>
+
+namespace LynxEngine
+{
+	LYNXENGCLASS extern ENUMDATA	LYNXDEPTHBUFFERMODE_EnumData[LYNX_NUM_DEPTHBUFFER_MODE];
+	LYNXENGCLASS extern ENUMDATA	LYNXCULLMODE_EnumData[LYNX_NUM_CULL_MODE];
+	LYNXENGCLASS extern ENUMDATA	LYNXTEXTUREADDRESSMODE_EnumData[LYNX_NUM_ADDRESS_MODE];
+	LYNXENGCLASS extern ENUMDATA	LYNXTEXTUREFILTERMODE_EnumData[5];
+	LYNXENGCLASS extern ENUMDATA	LYNXCOMBINEFUNC_EnumData[27];
+	LYNXENGCLASS extern ENUMDATA	TRANSPARENTTYPE_EnumData[MaterialSystem::CMaterial::NUM_TRANSPARENTTYPE];
+}
+
+#endif

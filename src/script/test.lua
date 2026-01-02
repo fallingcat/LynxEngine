@@ -1,0 +1,13 @@
+CTest = {	
+	InitTable = {
+		HP = 633,
+		MP = 3650,
+	}
+}
+
+function OnInit() 				
+	CDynamicObj.SetName("Derived Script Dynamic Obj")	
+	CDynamicObj.Forward(-10)			
+	--Test.InitTable.HP = Test.InitTable.HP+1 --CScene.GetVersion() + CDynamicObj.Add(19, 70)
+	return 1;
+end

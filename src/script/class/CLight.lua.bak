@@ -1,0 +1,15 @@
+CLight = class(CDynamicObj)
+-----------------------------------------	
+--
+-----------------------------------------	
+
+function OnInit() 				
+	Obj = CLight.new(1)
+	--Obj:SetName("Derived Script Light")	
+	--Obj:Yaw(50, POST)			
+	--Obj:Pitch(50, POST)			
+	--Obj.UpdateTransform()
+	--Obj:Forward(-10, POST)	
+	--Test.InitTable.HP = Test.InitTable.HP+1 --CScene.GetVersion() + CDynamicObj.Add(19, 70)
+	return 1;
+end

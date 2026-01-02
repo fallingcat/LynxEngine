@@ -1,0 +1,319 @@
+﻿//###########################################################################
+//    __                    ____            __
+//   / /  __ __ ___ _  __  / __/___  ____  /_/___  ____
+//  / /__/ // /  _ \ \/ / / __/  _ \/ __ \/ /  _ \/  _/
+//  \___/__, /__//_/_/\_\ \__/__//_/\__, /_/__//_/\__/
+//      /___/                       /___/ 
+// 
+//  LynxEngine Ver 1.00 
+//  Copyright (C) 2003 fallingCAT studios.  All Rights Reserved.
+//
+//
+//  Created by Owen Wu : 2005/11/02
+//  Last Update : 
+//--------------------------------------------------------------------------
+//  說明:
+//
+//###########################################################################
+
+#include <LynxEngine_PCH.h>
+#include <LynxEngine.h>
+#include <SceneSystem/LynxScn.h>
+#include <SceneSystem/LynxSceneSystem.h>
+#include <SceneSystem/Light/LynxPointLight.h>
+#include <SceneSystem/LynxScnDeferredRenderer.h>
+#include <GraphicsSystem/LynxGraphicsSystem.h>
+#include <GraphicsSystem/LynxRenderer.h>
+#include <GraphicsSystem/LynxCubeShadowMap.h>
+#include <GraphicsSystem/LynxDepthMap.h>
+#include <GraphicsSystem/LynxOffscreen.h>
+#include <GraphicsSystem/LynxDepthStencilState.h>
+#include <MaterialSystem/LynxMaterialTechnique.h>
+#include <ScriptSystem/LynxScript.h>
+#include <ScriptSystem/LynxScriptSystem.h>
+#include <ScriptSystem/LynxVMachine.h>
+#include <MaterialSystem/LynxMaterialTechnique.h>
+#include <MaterialSystem/LynxMaterialPass.h>
+#include <MaterialSystem/LynxMaterialSystem.h>
+#include <LynxBoxProxy.h>
+
+namespace LynxEngine 
+{
+	namespace SceneSystem 
+	{
+		IMPLEMENT_CLASSSCRIPT(CPointLight, CLight)
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		CPointLight::CPointLight(CScene* const lpscene)
+		: CLight(lpscene)
+		{
+			m_LightType = POINT;			
+			m_bProjectedLightMap = LYNX_FALSE;
+
+			INIT_CLASSSCRIPT
+		}
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		CPointLight::~CPointLight(void)
+		{			
+		}						
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		LYNXBOOL CPointLight::vCreate(int w, int h)
+		{		
+			LYNX_ASSERT(m_lpScene);
+
+			if (m_bCastShadow)
+			{
+				if (!CreateShadowmap(w, h))
+					return LYNX_FALSE;				
+			}
+
+			if (!CLight::vCreate(w, h))
+				return LYNX_FALSE;			
+		
+			m_Camera->SetFOV(90.0f, 90.0f);
+			m_Camera->m_Near = 0.0f;
+			m_Camera->m_Far = 600.0f;
+
+			CBoxProxy* pProxy = LYNXNEW CBoxProxy(m_lpEngine);
+			m_lpContainer->GetProxyList().push_back(pProxy);
+			pProxy->SetParent(this, NULL);
+			pProxy->SetName(m_Name + CString(_T(".Proxy00")));
+
+			return LYNX_TRUE;
+		}
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		void CPointLight::vComputeProxy()
+		{
+			Math::CVector3 R = Math::CVector3(m_Radius, m_Radius, m_Radius);
+			Math::CVector3 C(0.0f, 0.0f, 0.0f);
+
+			((CBoxProxy*)(*(m_lpContainer->GetProxyList().begin())))->Create(C, R);
+		}
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		LYNXBOOL CPointLight::CreateShadowmap(int w, int h)
+		{		
+			LYNX_ASSERT(m_lpScene);		
+
+			if (w != m_ShadowmapWidth || h !=  m_ShadowmapHeight)
+			{
+				if (m_lpShadowMap)
+				LYNXDEL m_lpShadowMap;
+
+				m_ShadowmapWidth = w;
+				m_ShadowmapHeight = h;			
+			
+				if (m_ShadowFilterType >= GraphicsSystem::CShadowMap::PCF && m_ShadowFilterType < GraphicsSystem::CShadowMap::VSM)
+				{
+					if (m_lpEngine->GetlpGraphicsSystem()->m_Config.bSharedShadowMap)
+						m_lpShadowMap = (GraphicsSystem::CShadowMap*)(m_lpScene->GetlpRenderer()->GetlpMap(CRenderer::SHARED_CUBESHADOWMAP));
+					else
+					{
+						m_lpShadowMap = LYNXNEW GraphicsSystem::CCubeShadowMap(m_lpEngine->GetlpGraphicsSystem());
+						if (!m_lpShadowMap)
+							return LYNX_FALSE;
+						if (!((GraphicsSystem::CCubeShadowMap*)m_lpShadowMap)->Create(GraphicsSystem::CRenderer::FORMAT_D24S8, 1, _T("Cube Shadow Map"), m_ShadowmapWidth, m_ShadowmapHeight, GraphicsSystem::CRenderer::FORMAT_R16F))
+							return LYNX_FALSE;	
+					}
+				}
+				else if (m_ShadowFilterType >= GraphicsSystem::CShadowMap::VSM && m_ShadowFilterType < GraphicsSystem::CShadowMap::NUM_SHADOWFILTER_TYPES)
+				{
+					m_lpShadowMap = LYNXNEW GraphicsSystem::CCubeShadowMap(m_lpEngine->GetlpGraphicsSystem());
+					if (!m_lpShadowMap)
+						return LYNX_FALSE;
+					if (!((GraphicsSystem::CCubeShadowMap*)m_lpShadowMap)->Create(GraphicsSystem::CRenderer::FORMAT_D24S8, 1, _T("Cube Shadow Map"), m_ShadowmapWidth, m_ShadowmapHeight, GraphicsSystem::CRenderer::FORMAT_G16R16F))
+						return LYNX_FALSE;	
+				}
+			}
+			return LYNX_TRUE;
+		}
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		void CPointLight::vComputeVisObjList() 
+		{
+			m_VisDynamicOpaqueObjList.clear();
+			
+			for (int i=0; i<m_lpScene->GetNumStaticObjs(); i++)							
+			{	
+				//if (m_lpScene->GetlpStaticObj(i)->GetlpContainer()->m_bCastShadow && m_lpScene->GetlpStaticObj(i)->GetlpContainer()->GetContainerType() != LynxEngine::CContainer::TERRAIN)
+				if (m_lpScene->GetlpStaticObj(i)->GetlpContainer()->m_bCastShadow)
+					m_VisDynamicOpaqueObjList.push_back(m_lpScene->GetlpStaticObj(i));				
+			}			
+			
+			for (int i=0; i<m_lpScene->GetNumDynamicObjs(); i++)							
+			{
+				if (m_lpScene->GetlpDynamicObj(i)->GetlpContainer()->m_bCastShadow)
+					m_VisDynamicOpaqueObjList.push_back(m_lpScene->GetlpDynamicObj(i));				
+			}			
+		}	
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		void CPointLight::vGenerateShadowMap(CCameraContainer* cam)
+		{
+			static Math::CColor Color(1.0f, 1.0f, 1.0f, 1.0f);			
+			LYNXMATRIX TM;
+			CList<CRenderableObj*>::CIterator Obj;
+			MaterialSystem::CMaterial::TECHTYPE Tech;		
+			GraphicsSystem::CBuffer*	MapRTs[2];	
+			GraphicsSystem::CBuffer*	RTs[4];	
+
+			m_Camera->SetLocalMatrix(GetLocalMatrix());
+			m_Camera->SetTransformMatrix(GetTransformMatrix());
+
+			LYNXRECT ViewportRect;
+			m_lpEngine->GetlpGraphicsSystem()->GetlpRenderer()->GetViewportRect(&ViewportRect);
+
+			if (m_ShadowFilterType >= GraphicsSystem::CShadowMap::VSM && m_ShadowFilterType < GraphicsSystem::CShadowMap::NUM_SHADOWFILTER_TYPES)
+				Tech = MaterialSystem::CMaterial::VARIANCE_SHADOWMAP;
+			else
+				Tech = MaterialSystem::CMaterial::SHADOWMAP;	
+
+			m_lpEngine->GetlpGraphicsSystem()->SetMapAsRenderBuffer(MapRTs, 0, m_lpShadowMap, 0);
+			RTs[1] = m_lpEngine->GetlpGraphicsSystem()->DisableRenderBuffer(1);		
+			RTs[2] = m_lpEngine->GetlpGraphicsSystem()->DisableRenderBuffer(2);		
+			RTs[3] = m_lpEngine->GetlpGraphicsSystem()->DisableRenderBuffer(3);		
+
+			for (int i=0; i<6; i++)
+			{
+				CalculateViewMatrix(i);				
+				m_Camera->m_Near = 1.0f;
+				m_Camera->m_Far = m_Radius;
+				m_Camera->UpdateProjectionMatrix(1.0f);				
+				lynxMatrixXMatrix(&m_LightViewProj, &m_Camera->GetViewMatrix(), &m_Camera->GetProjectionMatrix());													
+				m_lpEngine->GetlpGraphicsSystem()->SetMapAsRenderBuffer(NULL, 0, m_lpShadowMap, i);				
+				m_lpEngine->GetlpGraphicsSystem()->GetlpRenderer()->SetViewportRect(0, 0, m_lpShadowMap->GetWidth(), m_lpShadowMap->GetHeight());				
+				m_lpEngine->GetlpGraphicsSystem()->GetlpRenderer()->Clear(GraphicsSystem::CRenderer::RENDER_BUFFER|GraphicsSystem::CRenderer::DEPTH_BUFFER, Color, 1.0f, 0);				
+				
+				for (Obj = m_VisDynamicOpaqueObjList.begin(); Obj != m_VisDynamicOpaqueObjList.end(); ++Obj)
+				{
+					(*Obj)->SetCurrentMaterialTechnique(Tech);
+					(*Obj)->vRender(m_Camera);
+				}				
+
+				//if (m_ShadowFilterType >= GraphicsSystem::CShadowMap::VSM && m_ShadowFilterType < GraphicsSystem::CShadowMap::NUM_SHADOWFILTER_TYPES)
+				//{
+				//	// Variance shadow map
+				//	m_lpEngine->GetlpGraphicsSystem()->SetRenderBuffer(1, NULL);			
+				//	m_lpShadowMap->DownSampled();
+				//	m_lpShadowMap->BoxBlur(6, 2.0f);			
+				//}
+			}	
+			m_bShadowmapDirty = LYNX_FALSE;
+
+			m_lpEngine->GetlpGraphicsSystem()->SetRenderBuffer(0, MapRTs[0]);
+			m_lpEngine->GetlpGraphicsSystem()->SetDepthBuffer(MapRTs[1]);
+			m_lpEngine->GetlpGraphicsSystem()->SetRenderBuffer(1, RTs[1]);
+			m_lpEngine->GetlpGraphicsSystem()->SetRenderBuffer(2, RTs[2]);
+			m_lpEngine->GetlpGraphicsSystem()->SetRenderBuffer(3, RTs[3]);
+			m_lpEngine->GetlpGraphicsSystem()->GetlpRenderer()->SetViewportRect(ViewportRect.x1, ViewportRect.y1, ViewportRect.x2, ViewportRect.y2);
+		}		
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------
+		void CPointLight::vSetShaderParam(CCameraContainer* cam, CContainer* lpc)
+		{
+			CVector3 Pos;
+			float TexelGrad[2];
+			float Color[3];
+			LYNXMATRIX WLPM, WLM;
+
+			GraphicsSystem::CRenderer* lpR = m_lpEngine->GetlpGraphicsSystem()->GetlpRenderer();
+
+			cam->vGetPosition(Pos);
+			lpR->GetCachedVertexShader()->vSetConstantF("gCameraPos", &Pos.x, 3);
+			lynxMatrixXMatrix(&WLPM, &lpc->GetTransformMatrix(), &m_LightViewProj);			
+			lynxMatrixXMatrix(&WLM, &lpc->GetTransformMatrix(), &GetCamera().GetViewMatrix());							
+			lpR->GetCachedVertexShader()->vSetConstantM("gWorldLightViewProj", &WLPM);				
+			lpR->GetCachedVertexShader()->vSetConstantM("gWorldLightView", &WLM);					
+			GetPosition(Pos);
+			lpR->GetCachedVertexShader()->vSetConstantF("gLightPos", &Pos.x, 3);
+
+			if (lpc->m_bReceiveShadow)
+			{
+				lpR->GetCachedPixelShader()->vSetTexture(MaterialSystem::CMaterialSystem::GetMapString(MaterialSystem::SHADOWMAP).c_str(), GetShadowMap().GetCurrent());								
+				/*
+				lynxSetTextureAddressMode(MaterialSystem::CTechnique::SHADOWMAP_CHANNEL, LYNX_U_COORD, LYNX_ADDRESS_CLAMP);
+				lynxSetTextureAddressMode(MaterialSystem::CTechnique::SHADOWMAP_CHANNEL, LYNX_V_COORD, LYNX_ADDRESS_CLAMP);
+				if (m_ShadowFilterType >= GraphicsSystem::CShadowMap::VSM && 
+					m_ShadowFilterType < GraphicsSystem::CShadowMap::NUM_SHADOWFILTER_TYPES)
+					lynxSetTextureFilterMode(MaterialSystem::CTechnique::SHADOWMAP_CHANNEL, LYNX_TF_LINEAR, LYNX_TF_LINEAR, LYNX_TF_LINEAR); 
+				else
+					lynxSetTextureFilterMode(MaterialSystem::CTechnique::SHADOWMAP_CHANNEL, LYNX_TF_POINT, LYNX_TF_POINT, LYNX_TF_POINT); 					
+				lynxSetTextureBlend(MaterialSystem::CTechnique::SHADOWMAP_CHANNEL, LYNX_CF_MODULATE, LYNX_CA_CURRENT, LYNX_CA_TEXTURE, LYNX_CA_TEXTURE);	
+				lynxSetTextureBlend(MaterialSystem::CTechnique::SHADOWMAP_CHANNEL+1, LYNX_CF_NONE, LYNX_CA_TEXTURE, LYNX_CA_TEXTURE, LYNX_CA_TEXTURE);													
+				*/
+
+				TexelGrad[0] = 1.0f/(GetShadowMap().GetCurrent()->vGetWidth());
+				TexelGrad[1] = 1.0f/(GetShadowMap().GetCurrent()->vGetHeight());
+				lpR->GetCachedPixelShader()->vSetConstantF("gShadowmapTexelGrad", TexelGrad, 2);
+			}			
+			Color[0] = m_Color.Red/255.0f;
+			Color[1] = m_Color.Green/255.0f;
+			Color[2] = m_Color.Blue/255.0f;
+			lpR->GetCachedPixelShader()->vSetConstantF("gLight.Color", Color, 3);
+			lpR->GetCachedPixelShader()->vSetConstantF("gLight.Intensity", m_Intensity);
+			lpR->GetCachedPixelShader()->vSetConstantF("gLight.Radius", m_Radius);
+			lpR->GetCachedPixelShader()->vSetConstantF("gZBias", m_DepthBias);
+			lpR->GetCachedPixelShader()->vSetConstantI("gShadowFilterType", m_ShadowFilterType);
+
+			lpR->GetCachedPixelShader()->vSetConstantB("gbSelfIlluminated", lpc->m_bSelfIlluminated);
+			lpR->GetCachedPixelShader()->vSetConstantF("gIlluminatingIntensity", lpc->m_IlluminatingIntensity);					
+			lpR->GetCachedPixelShader()->vSetConstantF("gSpecularPower", lpc->GetlpCurrentMaterial()->m_SpPower);								
+			lpR->GetCachedPixelShader()->vSetConstantB("gbShadowing", lpc->m_bReceiveShadow);		
+		}
+		//-------------------------------------------------------------------------------------------------------
+		//
+		//  說明:   
+		//-------------------------------------------------------------------------------------------------------	
+		void CPointLight::vDeferredLighting(CCameraContainer* cam) 
+		{					
+			CDeferredRenderer* lpR = static_cast<CDeferredRenderer*>(m_lpScene->GetlpRenderer());
+			GraphicsSystem::CGraphicsSystem* lpG = m_lpEngine->GetlpGraphicsSystem();									
+			//cam->CalculateFarCornerDir(((float)lpG->GetlpOffscreen()->GetTexture()->vGetWidth())/((float)lpG->GetlpOffscreen()->GetTexture()->vGetHeight()));
+			lpG->SetupScreenSpaceDepthQuadFarCornerDir_UVOffset(&(lpR->GetlpDeferredLightingMaterial(CDeferredRenderer::POINT_LIGHTING)->GetTechnique(MaterialSystem::CMaterial::SIMPLE).GetPass(0)), *cam);						
+			lpR->GetlpDeferredLightingMaterial(CDeferredRenderer::POINT_LIGHTING)->GetTechnique((MaterialSystem::CMaterial::TECHTYPE)0).GetPass(0).Set(m_lpContainer, cam);	
+
+			//ComputeScreenSpaceAABB(cam);
+			//lpG->EnableScissorRect(LYNX_TRUE);
+			//LYNXRECT Rect;
+			//lpG->ConvertScreenSpaceToScissorSpace(&Rect, m_ScreenSpaceAABB.Min().x, m_ScreenSpaceAABB.Min().y, m_ScreenSpaceAABB.Max().x, m_ScreenSpaceAABB.Max().y);
+			//lpG->SetScissorRect(Rect.x1, Rect.y1, Rect.x2, Rect.y2);
+			lpG->DrawScreenSpaceQuad();
+			//lpG->EnableScissorRect(LYNX_FALSE);
+			
+
+			/*
+			GraphicsSystem::CGraphicsSystem* lpG = m_lpEngine->GetlpGraphicsSystem();		
+			cam->CalculateFarCornerDir(((float)lpG->GetlpOffscreen()->GetTexture()->vGetWidth())/((float)lpG->GetlpOffscreen()->GetTexture()->vGetHeight()));			
+			lpG->GetPostProcessMaterial(GraphicsSystem::CGraphicsSystem::POINT_LIGHTING)->GetTechnique((MaterialSystem::CMaterial::TECHTYPE)0).GetPass(0).Set(m_lpContainer, cam);							
+			ComputeScreenSpaceAABB(cam);			
+			if (!(m_ScreenSpaceAABB.Min().x >= 1.0f || m_ScreenSpaceAABB.Max().x <= -1.0f || m_ScreenSpaceAABB.Min().y >= 1.0f || m_ScreenSpaceAABB.Max().y <= -1.0f))
+			{
+				float x1 = LYNX_MAX(m_ScreenSpaceAABB.Min().x, -1.0f);
+				float y1 = LYNX_MAX(m_ScreenSpaceAABB.Min().y, -1.0f);
+				float x2 = LYNX_MIN(m_ScreenSpaceAABB.Max().x,  1.0f);
+				float y2 = LYNX_MIN(m_ScreenSpaceAABB.Max().y,  1.0f);
+				lpG->DrawScreenSpaceDepthQuad(*cam, x1, y1, x2, y2);								
+			}
+			*/
+		}
+	}
+}

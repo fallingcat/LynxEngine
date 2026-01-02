@@ -1,0 +1,36 @@
+Microsoft Visual Studio Solution File, Format Version 8.00
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LynxScript", "LynxScript.vcproj", "{628A33D2-4777-42FF-8ABB-E9941EF092B7}"
+	ProjectSection(ProjectDependencies) = postProject
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfiguration) = preSolution
+		D3D DLL Debug = D3D DLL Debug
+		Release = Release
+		Win32 D3D Novodex Debug = Win32 D3D Novodex Debug
+		Win32 D3D ODE Debug = Win32 D3D ODE Debug
+		Win32 D3D Release = Win32 D3D Release
+		Win32 OGL Debug = Win32 OGL Debug
+		Win32 OGL Tool Debug = Win32 OGL Tool Debug
+	EndGlobalSection
+	GlobalSection(ProjectConfiguration) = postSolution
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.D3D DLL Debug.ActiveCfg = D3D DLL Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.D3D DLL Debug.Build.0 = D3D DLL Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Release.ActiveCfg = Release|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Release.Build.0 = Release|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 D3D Novodex Debug.ActiveCfg = Win32 D3D Novodex Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 D3D Novodex Debug.Build.0 = Win32 D3D Novodex Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 D3D ODE Debug.ActiveCfg = Win32 D3D Tool Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 D3D ODE Debug.Build.0 = Win32 D3D Tool Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 D3D Release.ActiveCfg = Win32 D3D Release|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 D3D Release.Build.0 = Win32 D3D Release|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 OGL Debug.ActiveCfg = Win32 OGL Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 OGL Debug.Build.0 = Win32 OGL Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 OGL Tool Debug.ActiveCfg = Win32 OGL Tool Debug|Win32
+		{628A33D2-4777-42FF-8ABB-E9941EF092B7}.Win32 OGL Tool Debug.Build.0 = Win32 OGL Tool Debug|Win32
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+	EndGlobalSection
+	GlobalSection(ExtensibilityAddIns) = postSolution
+	EndGlobalSection
+EndGlobal

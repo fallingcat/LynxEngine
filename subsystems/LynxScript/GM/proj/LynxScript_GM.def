@@ -1,0 +1,6 @@
+LIBRARY      "LynxScript_GM"
+
+EXPORTS
+	CreateSystem
+    ReleaseSystem
+    
